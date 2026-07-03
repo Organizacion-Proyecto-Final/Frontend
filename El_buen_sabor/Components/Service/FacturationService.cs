@@ -56,6 +56,23 @@ namespace El_buen_sabor.Components.Service
             response.EnsureSuccessStatusCode();
         }
 
+        public async Task ConfirmTablePaymentAsync(string tableNumber)
+        {
+            var response = await _http.PutAsync(
+                $"api/v1/orders/facturas/table/{Uri.EscapeDataString(tableNumber)}/pay",
+                null);
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<FacturationMetricsDto> GetMetricsAsync()
+        {
+            var result = await _http.GetFromJsonAsync<FacturationMetricsDto>(
+                "api/v1/orders/facturas/metrics");
+
+            return result ?? new FacturationMetricsDto();
+        }
+
         public async Task ConfirmOrdersForInvoiceAsync(List<OrderToInvoiceDto> orders)
         {
             Console.WriteLine(orders == null

@@ -1,6 +1,7 @@
 ﻿@page "/Facturation"
 @layout AdminLayout
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @using El_buen_sabor.Components.Interface
 @inject NavigationManager Navigation
 @inject IFacturationService _facturationService 
@@ -34,7 +35,7 @@
             </div>
 
             <button class="apply-btn @(isLoading ? "disabled" : "")"
-            @onclick="LoadFacturas"
+            @onclick="() => LoadFacturas()"
             disabled="@isLoading">
                 Aplicar →
             </button>
@@ -97,7 +98,7 @@
                     {
                         <tr>
                             <td>Mesa @item.TableName</td>
-                            <td>@item.Date.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@ToUtcMinus3(item.Date).ToString("dd/MM/yyyy HH:mm")</td>
                             <td>$@item.Total.ToString("0.00")</td>
 
                             <td>
@@ -221,7 +222,7 @@
                 <h3>Mesa @selectedFacturaDetail.TableName</h3>
 
                 <p class="detail-date">
-                    Fecha: @selectedFacturaDetail.Date.ToString("dd/MM/yyyy HH:mm")
+                    Fecha: @ToUtcMinus3(selectedFacturaDetail.Date).ToString("dd/MM/yyyy HH:mm")
                 </p>
             </div>
 
@@ -285,6 +286,7 @@
     private string? modalMessage;
     private bool isLoading = true;
     private bool showDetailModal = false;
+    private readonly CancellationTokenSource refreshCancellation = new();
 
 
     private DateTime? fromDate = DateTime.Today.AddDays(-60);
@@ -318,22 +320,58 @@
     // LOAD (BACK SIMULADO)
     // =========================
 
-    private async Task LoadFacturas()
+    private async Task LoadFacturas(bool showLoading = true)
     {
-        isLoading = true;
+        if (showLoading)
+            isLoading = true;
 
-        result = await _facturationService.GetFacturasAsync(
-            currentPage,
-            pageSize,
-            fromDate,
-            toDate,
-            selectedPaymentFilter
-        );
+        try
+        {
+            result = await _facturationService.GetFacturasAsync(
+                currentPage,
+                pageSize,
+                fromDate,
+                toDate,
+                selectedPaymentFilter
+            );
 
-        TotalPages = result.TotalPages;
-        TotalItems = result?.TotalItems ?? 0; 
+            TotalPages = result.TotalPages;
+            TotalItems = result?.TotalItems ?? 0;
+        }
+        finally
+        {
+            if (showLoading)
+                isLoading = false;
+        }
+    }
 
-        isLoading = false;
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _ = RefreshPeriodicallyAsync(refreshCancellation.Token);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshPeriodicallyAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadFacturas(showLoading: false);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // La actualización se detiene al abandonar la página.
+        }
     }
 
     // =========================
@@ -410,6 +448,18 @@
         return factura.Details.Sum(d => d.Price * d.Quantity);
     }
 
+    private static DateTime ToUtcMinus3(DateTime date)
+    {
+        var utcDate = date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
+
+        return utcDate.AddHours(-3);
+    }
+
     private async Task PrintTicket(FacturaDto factura)
     {
         await JS.InvokeVoidAsync("printTicket", "POS-58", factura);
@@ -441,5 +491,11 @@
         }
     }
 
+    public ValueTask DisposeAsync()
+    {
+        refreshCancellation.Cancel();
+        refreshCancellation.Dispose();
+        return ValueTask.CompletedTask;
+    }
 
 }

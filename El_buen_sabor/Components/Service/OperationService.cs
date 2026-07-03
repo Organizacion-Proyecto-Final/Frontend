@@ -249,6 +249,32 @@ namespace El_buen_sabor.Components.Service
             return result;
         }
 
+        public async Task<OperationResultDto> ConfirmTablePaymentAsync()
+        {
+            var activeOrders = await GetActiveOrdersAsync();
+            if (activeOrders.Count == 0)
+                return Fail("No hay órdenes activas para cobrar.");
+
+            if (!activeOrders.All(order => order.Status == OrderStatuses.ReadyToClose))
+                return Fail("Primero solicitá la cuenta de todas las órdenes.");
+
+            var tableNumber = activeOrders[0].TableNumber;
+
+            try
+            {
+                await _facturationService.ConfirmTablePaymentAsync(tableNumber);
+                return new OperationResultDto
+                {
+                    Success = true,
+                    Message = "Pago confirmado."
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return Fail("No se encontró una factura pendiente para esta mesa.");
+            }
+        }
+
         private async Task<Order?> GetActiveOrderAsync()
         {
             if (table is null)

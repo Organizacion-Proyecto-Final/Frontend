@@ -5,7 +5,7 @@
     money: null,
     weekly: null,
 
-    create: function (id, type, labels, data) {
+    create: function (id, type, labels, data, valueType) {
 
         const canvas = document.getElementById(id);
         const ctx = canvas.getContext("2d");
@@ -81,7 +81,26 @@
                         borderWidth: 1,
                         cornerRadius: 10,
                         padding: 12,
-                        displayColors: false
+                        displayColors: false,
+                        callbacks: {
+                            label: function (context) {
+                                const value = context.parsed.y;
+
+                                if (valueType === "currency") {
+                                    return new Intl.NumberFormat("es-AR", {
+                                        style: "currency",
+                                        currency: "ARS",
+                                        maximumFractionDigits: 0
+                                    }).format(value);
+                                }
+
+                                if (valueType === "units") {
+                                    return `${value} ${value === 1 ? "unidad vendida" : "unidades vendidas"}`;
+                                }
+
+                                return `${value} ${value === 1 ? "factura generada" : "facturas generadas"}`;
+                            }
+                        }
                     }
 
                 },
@@ -141,28 +160,32 @@
             "topProductsChart",
             "bar",
             tpL,
-            tpV
+            tpV,
+            "units"
         );
 
         this.hours = this.create(
             "hoursChart",
             "line",
             hL,
-            hV
+            hV,
+            "invoices"
         );
 
         this.money = this.create(
             "moneyProductsChart",
             "bar",
             mL,
-            mV
+            mV,
+            "currency"
         );
 
         this.weekly = this.create(
             "weeklyHoursChart",
             "bar",
             hSL,
-            hSV
+            hSV,
+            "invoices"
         );
     }
 

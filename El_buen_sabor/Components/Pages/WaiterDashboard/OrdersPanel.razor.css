@@ -146,6 +146,7 @@
 }
 
 .bill-btn,
+.payment-btn,
 .release-btn,
 .deliver-table-btn {
     border: 0;
@@ -165,6 +166,10 @@
     background: #16a34a;
 }
 
+.payment-btn {
+    background: #2563eb;
+}
+
 .deliver-table-btn {
     background: #16a34a;
 }
@@ -175,6 +180,7 @@
 }
 
 .bill-btn:disabled,
+.payment-btn:disabled,
 .release-btn:disabled,
 .deliver-table-btn:disabled {
     cursor: default;
@@ -509,6 +515,7 @@
     }
 
     .bill-btn,
+    .payment-btn,
     .release-btn {
         min-height: 40px;
     }

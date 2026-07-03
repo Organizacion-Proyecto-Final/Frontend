@@ -54,7 +54,20 @@ window.printTicket = async function (printerName, factura) {
 
         ticket += "Factura : " + factura.id + "\n";
         ticket += "Mesa    : " + factura.tableNumber + "\n";
-        ticket += "Fecha   : " + new Date(factura.date).toLocaleString() + "\n";
+        const utcDate = /(?:Z|[+-]\d{2}:\d{2})$/i.test(factura.date)
+            ? factura.date
+            : factura.date + "Z";
+        const argentinaDate = new Intl.DateTimeFormat("es-AR", {
+            timeZone: "America/Argentina/Buenos_Aires",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+        }).format(new Date(utcDate));
+
+        ticket += "Fecha   : " + argentinaDate + "\n";
 
         ticket += "================================\n";
         ticket += "CANT  PRODUCTO\n";

@@ -62,8 +62,8 @@ builder.Services.AddHttpClient<StockService>(client =>
 });
 builder.Services.AddHttpClient<IFacturationService, FacturationService>(client =>
 {
-    var stockBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7030/";
-    client.BaseAddress = new Uri(stockBaseUrl);
+    var ordersBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7100/";
+    client.BaseAddress = new Uri(ordersBaseUrl);
 });
 
 builder.Services.AddBlazoredLocalStorage();

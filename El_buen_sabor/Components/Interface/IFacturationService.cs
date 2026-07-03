@@ -13,6 +13,8 @@ namespace El_buen_sabor.Components.Interface
             PaymentFilter filter);
 
         Task ConfirmPaymentAsync(int facturaId);
+        Task ConfirmTablePaymentAsync(string tableNumber);
         Task ConfirmOrdersForInvoiceAsync(List<OrderToInvoiceDto> orders);
+        Task<FacturationMetricsDto> GetMetricsAsync();
     }
 }
