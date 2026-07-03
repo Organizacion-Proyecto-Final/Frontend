@@ -146,11 +146,11 @@
     private CancellationTokenSource? _clockTimerCancellation;
     private List<KitchenQueueItemDto> cookingItems = [];
     private List<KitchenQueueItemDto> waitingItems = [];
-    private HashSet<Guid>? _knownItemIds;
+    private bool _queueInitialized;
+    private readonly HashSet<Guid> _announcedProductionItemIds = [];
+    private readonly HashSet<Guid> _announcedNowItemIds = [];
     private readonly Dictionary<Guid, DateTime> _newItemSince = [];
     private static readonly TimeSpan NewItemTagDuration = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan SoundThrottle = TimeSpan.FromSeconds(10);
-    private DateTime? _lastSoundPlayedAt;
     private KitchenItemView? _itemToConfirm;
     private bool isLoading;
     private bool isCompleting;
@@ -235,10 +235,17 @@
         {
             while (_clockTimer is not null && await _clockTimer.WaitForNextTickAsync(cancellationToken))
             {
-                UpdateClock();
-                ExpireNewItemTags();
-                ClampCurrentPage();
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(async () =>
+                {
+                    UpdateClock();
+                    var shouldPlaySound = DetectNowItems();
+                    ExpireNewItemTags();
+                    ClampCurrentPage();
+                    StateHasChanged();
+
+                    if (shouldPlaySound)
+                        await PlayNewDishSoundAsync();
+                });
             }
         }
         catch (OperationCanceledException)
@@ -263,11 +270,14 @@
             var cookingTask = KitchenService.GetCookingItemsAsync();
             var waitingTask = KitchenService.GetWaitingItemsAsync();
             await Task.WhenAll(cookingTask, waitingTask);
-            ApplyQueueSnapshot(new KitchenQueueSnapshotDto
+            var shouldPlaySound = ApplyQueueSnapshot(new KitchenQueueSnapshotDto
             {
                 Cooking = cookingTask.Result,
                 Waiting = waitingTask.Result
             });
+
+            if (shouldPlaySound)
+                await InvokeAsync(PlayNewDishSoundAsync);
         }
         catch
         {
@@ -283,52 +293,93 @@
 
     private async Task HandleQueueChanged(KitchenQueueSnapshotDto snapshot)
     {
-        await InvokeAsync(() =>
+        await InvokeAsync(async () =>
         {
-            ApplyQueueSnapshot(snapshot);
+            var shouldPlaySound = ApplyQueueSnapshot(snapshot);
             errorMessage = null;
             StateHasChanged();
+
+            if (shouldPlaySound)
+                await PlayNewDishSoundAsync();
         });
     }
 
-    private void ApplyQueueSnapshot(KitchenQueueSnapshotDto snapshot)
+    private bool ApplyQueueSnapshot(KitchenQueueSnapshotDto snapshot)
     {
         UpdateClock();
 
-        var incoming = (snapshot.Cooking ?? []).Concat(snapshot.Waiting ?? []).ToList();
-        var incomingIds = incoming.Select(item => item.ItemId).ToHashSet();
-
-        if (_knownItemIds is not null)
-        {
-            var nowThreshold = _nowUtc.AddSeconds(30);
-            var newNowItemIds = incoming
-                .Where(item => !_knownItemIds.Contains(item.ItemId)
-                    && item.StartTime.HasValue
-                    && AsUtc(item.StartTime.Value) <= nowThreshold)
-                .Select(item => item.ItemId)
-                .ToList();
-
-            if (newNowItemIds.Count > 0)
-            {
-                var stampedAt = DateTime.UtcNow;
-                foreach (var itemId in newNowItemIds)
-                    _newItemSince[itemId] = stampedAt;
-
-                if (_lastSoundPlayedAt is null || DateTime.UtcNow - _lastSoundPlayedAt.Value >= SoundThrottle)
-                {
-                    _lastSoundPlayedAt = DateTime.UtcNow;
-                    _ = PlayNewDishSoundAsync();
-                }
-            }
-        }
-
-        _knownItemIds = incomingIds;
         cookingItems = snapshot.Cooking ?? [];
         waitingItems = snapshot.Waiting ?? [];
+        var shouldPlaySound = false;
+
+        if (!_queueInitialized)
+        {
+            foreach (var itemId in ProductionItemIds())
+                _announcedProductionItemIds.Add(itemId);
+
+            foreach (var itemId in NowItemIds())
+                _announcedNowItemIds.Add(itemId);
+
+            _queueInitialized = true;
+        }
+        else
+        {
+            DetectProductionItemTags();
+            shouldPlaySound = DetectNowItems();
+        }
+
         ClampCurrentPage();
+        return shouldPlaySound;
     }
 
     private bool IsNew(Guid itemId) => _newItemSince.ContainsKey(itemId);
+
+    private void DetectProductionItemTags()
+    {
+        if (!_queueInitialized)
+            return;
+
+        var newProductionItemIds = ProductionItemIds()
+            .Where(_announcedProductionItemIds.Add)
+            .ToList();
+
+        if (newProductionItemIds.Count == 0)
+            return;
+
+        var stampedAt = DateTime.UtcNow;
+        foreach (var itemId in newProductionItemIds)
+            _newItemSince[itemId] = stampedAt;
+    }
+
+    private bool DetectNowItems()
+    {
+        if (!_queueInitialized)
+            return false;
+
+        var newNowItemIds = NowItemIds()
+            .Where(_announcedNowItemIds.Add)
+            .ToList();
+
+        if (newNowItemIds.Count == 0)
+            return false;
+
+        return true;
+    }
+
+    private IEnumerable<Guid> ProductionItemIds() => cookingItems
+        .Concat(waitingItems.Where(HasProductionStartAssigned))
+        .Select(item => item.ItemId);
+
+    private static bool HasProductionStartAssigned(KitchenQueueItemDto item)
+        => item.StartTime.HasValue;
+
+    private IEnumerable<Guid> NowItemIds() => cookingItems
+        .Concat(waitingItems)
+        .Where(HasStartedNow)
+        .Select(item => item.ItemId);
+
+    private bool HasStartedNow(KitchenQueueItemDto item)
+        => item.StartTime.HasValue && AsUtc(item.StartTime.Value) <= _nowUtc;
 
     private void ExpireNewItemTags()
     {

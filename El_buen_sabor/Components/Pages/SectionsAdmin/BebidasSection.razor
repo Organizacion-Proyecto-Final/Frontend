@@ -347,7 +347,7 @@
         StateHasChanged();
 
         var result = await _menuService.GetDrinksPageAsync(currentPage, PageSize, searchText, GetAvailableFilter(), sortFilter);
-        var drinkStocks = await _stockService.GetDrinkStocksAsync();
+        var drinkStocks = await _stockService.GetDrinkStocksByDrinkIdsAsync(result.Items.Select(drink => drink.Id));
         var stocksByDrink = drinkStocks
             .Where(stock => stock.Id_Drink.HasValue)
             .ToDictionary(stock => stock.Id_Drink!.Value, stock => stock);

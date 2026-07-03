@@ -244,6 +244,34 @@ namespace El_buen_sabor.Components.Service
             }
         }
 
+        public async Task<List<DrinkStockDto>> GetDrinkStocksByDrinkIdsAsync(IEnumerable<Guid> drinkIds)
+        {
+            var ids = drinkIds
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToArray();
+
+            if (ids.Length == 0)
+                return [];
+
+            try
+            {
+                var query = string.Join("&", ids.Select(id => $"drinkIds={id}"));
+                using var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, $"api/v1/stocks/drinks?{query}");
+                using var response = await _http.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return [];
+
+                return await response.Content.ReadFromJsonAsync<List<DrinkStockDto>>() ?? [];
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener stocks de bebidas por ids: {ex.Message}");
+                return [];
+            }
+        }
+
         public async Task<bool> CreateDrinkStockAsync(Guid drinkId, decimal count)
         {
             try
