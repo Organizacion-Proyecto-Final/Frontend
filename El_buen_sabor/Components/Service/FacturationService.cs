@@ -1,14 +1,11 @@
-﻿using System.Net.Http.Headers;
+using System.Globalization;
 using System.Net.Http.Json;
-using Blazored.LocalStorage;
-using El_buen_sabor.Components.Models;
 using El_buen_sabor.Components.Interface;
+using El_buen_sabor.Components.Models;
 using static El_buen_sabor.Components.Pages.SectionsAdmin.FacturationSection;
-
 
 namespace El_buen_sabor.Components.Service
 {
-
     public class FacturationService : IFacturationService
     {
         private readonly HttpClient _http;
@@ -25,18 +22,26 @@ namespace El_buen_sabor.Components.Service
             DateTime? toDate,
             PaymentFilter filter)
         {
-            var url =
-                $"api/v1/orders/facturas?PageNumber={pageNumber}" +
-                $"&PageSize={pageSize}" +
-                $"&Filter={(int)filter}";
+            var queryParameters = new List<string>
+            {
+                $"PageNumber={pageNumber.ToString(CultureInfo.InvariantCulture)}",
+                $"PageSize={pageSize.ToString(CultureInfo.InvariantCulture)}",
+                $"Filter={Uri.EscapeDataString(filter.ToString())}"
+            };
 
             if (fromDate.HasValue)
-                url += $"&FromDate={fromDate.Value:O}";
+            {
+                queryParameters.Add(
+                    $"FromDate={Uri.EscapeDataString(fromDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
+            }
 
             if (toDate.HasValue)
-                url += $"&ToDate={toDate.Value:O}";
+            {
+                queryParameters.Add(
+                    $"ToDate={Uri.EscapeDataString(toDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
+            }
 
-
+            var url = $"api/v1/orders/facturas?{string.Join("&", queryParameters)}";
             var result = await _http.GetFromJsonAsync<FacturePagedResponseDto<FacturaDto>>(url);
 
             return result ?? new FacturePagedResponseDto<FacturaDto>();
@@ -70,6 +75,5 @@ namespace El_buen_sabor.Components.Service
 
             response.EnsureSuccessStatusCode();
         }
-
     }
 }
