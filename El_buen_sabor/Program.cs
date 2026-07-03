@@ -2,6 +2,7 @@ using Blazored.LocalStorage;
 using El_buen_sabor.Components;
 using El_buen_sabor.Components.Interface;
 using El_buen_sabor.Components.Service;
+using El_buen_sabor;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,9 +16,15 @@ builder.Services.AddScoped<KitchenRealtimeService>();
 builder.Services.AddScoped<IOperationService, OperationService>();
 builder.Services.AddScoped<IFacturationService, FacturationService>();
 
+
+
+
+Console.WriteLine(builder.Configuration["ExternalServices:Menu:BaseUrl"]);
+Console.WriteLine(" ES EL DE ARRIBA");
+
 builder.Services.AddScoped(sp =>
 {
-    var authBaseUrl = builder.Configuration["http://localhost:5155/"] ?? "http://localhost:5155/";
+    var authBaseUrl = builder.Configuration["ExternalServices:Auth:BaseUrl"] ?? "https://localhost:7060/";
     return new HttpClient
     {
         BaseAddress = new Uri(authBaseUrl)
@@ -25,38 +32,38 @@ builder.Services.AddScoped(sp =>
 });
 builder.Services.AddHttpClient<MenuService>(client =>
 {
-    var menuBaseUrl = builder.Configuration["http://localhost:5127/"] ?? "http://localhost:5127/";
+    var menuBaseUrl = builder.Configuration["ExternalServices:Menu:BaseUrl"] ?? "https://localhost:7025/";
     client.BaseAddress = new Uri(menuBaseUrl);
 });
 builder.Services.AddHttpClient<MenuCatalogService>(client =>
 {
-    var menuBaseUrl = builder.Configuration["http://localhost:5127/"] ?? "http://localhost:5127/";
+    var menuBaseUrl = builder.Configuration["ExternalServices:Menu:BaseUrl"] ?? "https://localhost:7025/";
     client.BaseAddress = new Uri(menuBaseUrl);
 });
 builder.Services.AddHttpClient<ITableService, TableService>(client =>
 {
-    var ordersBaseUrl = builder.Configuration["http://localhost:5231/"] ?? "http://localhost:5231/";
+    var ordersBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7100/";
     client.BaseAddress = new Uri(ordersBaseUrl);
 });
 builder.Services.AddHttpClient<TablesService>(client =>
 {
-    var ordersBaseUrl = builder.Configuration["http://localhost:5231/"] ?? "http://localhost:5231/";
+    var ordersBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7100/";
     client.BaseAddress = new Uri(ordersBaseUrl);
 });
 builder.Services.AddHttpClient<KitchenService>(client =>
 {
-    var kitchenBaseUrl = builder.Configuration["http://localhost:5207/"] ?? "http://localhost:5207/";
+    var kitchenBaseUrl = builder.Configuration["ExternalServices:Kitchen:BaseUrl"] ?? "https://localhost:7200/";
     client.BaseAddress = new Uri(kitchenBaseUrl);
 });
 builder.Services.AddHttpClient<StockService>(client =>
 {
-    var stockBaseUrl = builder.Configuration["http://localhost:5093/"] ?? "http://localhost:5093/";
+    var stockBaseUrl = builder.Configuration["ExternalServices:Stock:BaseUrl"] ?? "https://localhost:7030/";
     client.BaseAddress = new Uri(stockBaseUrl);
 });
-
 builder.Services.AddHttpClient<IFacturationService, FacturationService>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5231/");
+    var stockBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7030/";
+    client.BaseAddress = new Uri(stockBaseUrl);
 });
 
 builder.Services.AddBlazoredLocalStorage();

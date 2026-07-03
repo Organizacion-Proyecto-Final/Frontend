@@ -390,6 +390,7 @@
 
     private async Task ConfirmRequestBill()
     {
+
         await RunTableAction(OperationService.RequestBillAsync);
         showBillConfirm = false;
     }

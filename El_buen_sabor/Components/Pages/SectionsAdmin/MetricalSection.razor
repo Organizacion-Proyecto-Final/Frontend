@@ -1,0 +1,167 @@
+﻿@page "/Metrical"
+@layout AdminLayout
+@rendermode InteractiveServer
+@using El_buen_sabor.Components.Interface
+@inject NavigationManager Navigation
+@inject IFacturationService _facturationService
+@inject IJSRuntime JS
+@using El_buen_sabor.Components.Models
+@using El_buen_sabor.Components.Service
+@using El_buen_sabor.Components.Layout
+@using System.Drawing.Printing;
+
+
+
+<hr class="my-4" />
+
+<div class="metrics-section">
+
+    <!-- ================= CARDS ================= -->
+    <div class="metrics-cards">
+
+        <div class="metric-card">
+            <span>💰 Ventas Hoy</span>
+            <h2>@todayTotal.ToString("C")</h2>
+            <small>@todayCount facturas</small>
+        </div>
+
+        <div class="metric-card">
+            <span>📅 Ventas del Mes</span>
+            <h2>@monthTotal.ToString("C")</h2>
+            <small>@monthCount facturas</small>
+        </div>
+
+    </div>
+
+    <!-- ================= GRID CHARTS ================= -->
+    <div class="metrics-grid">
+
+        <!-- TOP PRODUCTS -->
+        <div class="metric-panel">
+            <h4>🏆 Top 10 Productos Más Vendidos</h4>
+            <canvas id="topProductsChart"></canvas>
+        </div>
+
+        <!-- HOURS -->
+        <div class="metric-panel">
+            <h4>🕒 Horarios de Mayor Concurrencia</h4>
+            <canvas id="hoursChart"></canvas>
+        </div>
+
+    </div>
+
+    <!-- ================= MONEY PRODUCTS ================= -->
+    <div class="metrics-grid">
+
+        <div class="metric-panel">
+            <h4>💵 Productos que Más Dinero </h4>
+            <canvas id="moneyProductsChart"></canvas>
+        </div>
+
+        <div class="metric-panel">
+            <h4>🕒 concurrencia en la semana </h4>
+            <canvas id="weeklyHoursChart"></canvas>
+        </div>
+
+    </div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+@code {
+
+
+    private decimal todayTotal = 128450;
+    private int todayCount = 37;
+
+    private decimal monthTotal = 3845720;
+    private int monthCount = 842;
+
+    private bool loaded;
+
+    private List<string> topProductsLabels = new()
+    {
+        "Hamburguesa",
+        "Pizza",
+        "Papas",
+        "Coca Cola",
+        "Agua"
+    };
+
+        private List<int> topProductsValues = new()
+    {
+        152, 128, 103, 92, 68
+    };
+
+    private List<string> hoursLabels = new()
+    {
+        "9","10","11","12","13","14","15","16","17","18","19","20","21","22","23"
+    };
+
+    private List<int> hoursValues = new()
+    {
+        10  ,20  ,35  ,60  ,75,  50,  30,  35,  40,  50,  40,  45, 90, 82, 60 
+    };
+
+    private List<string> hoursLabelsemanal = new()
+    {
+        "Dom","Lun","Mar","Mié","Jue","Vie","Sáb"
+    };
+
+    private List<int> hoursValuesemanal = new()
+    {
+        60,20,35,60,69,95,90
+    };
+
+
+        private List<string> moneyLabels = new()
+    {
+        "Pizza Especial",
+        "Lomo Completo",
+        "Hamburguesa",
+        "Rabas",
+        "asado",
+        "cerveza",
+        "pastas"
+        
+    };
+
+        private List<decimal> moneyValues = new()
+    {
+        458000, 412000, 338000, 281000, 270000, 220000, 180000
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !loaded)
+        {
+            loaded = true;
+
+            await JS.InvokeVoidAsync(
+                "charts.renderAll",
+                topProductsLabels,
+                topProductsValues,
+                hoursLabels,
+                hoursValues,
+                moneyLabels,
+                moneyValues,
+                hoursLabelsemanal,
+                hoursValuesemanal
+
+            );
+        }
+    }
+
+
+
+
+}

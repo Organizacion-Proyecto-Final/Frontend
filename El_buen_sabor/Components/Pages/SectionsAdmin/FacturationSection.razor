@@ -96,7 +96,7 @@
                     @foreach (var item in result.Items)
                     {
                         <tr>
-                            <td>Mesa @item.TableNumber</td>
+                            <td>Mesa @item.TableName</td>
                             <td>@item.Date.ToString("dd/MM/yyyy HH:mm")</td>
                             <td>$@item.Total.ToString("0.00")</td>
 
@@ -175,7 +175,7 @@
             <span class="modal-eyebrow">Confirmar pago</span>
 
             <h3 id="pay-title">
-                Mesa @selectedFacturaPay.TableNumber
+                Mesa @selectedFacturaPay.TableName
             </h3>
 
             <p>
@@ -218,7 +218,7 @@
             <div class="detail-header">
                 <span class="modal-eyebrow">Detalle de factura</span>
 
-                <h3>Mesa @selectedFacturaDetail.TableNumber</h3>
+                <h3>Mesa @selectedFacturaDetail.TableName</h3>
 
                 <p class="detail-date">
                     Fecha: @selectedFacturaDetail.Date.ToString("dd/MM/yyyy HH:mm")

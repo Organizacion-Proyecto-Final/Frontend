@@ -41,6 +41,10 @@ window.printTicket = async function (printerName, factura) {
         ticket += "\x1B\x61\x01";
         ticket += "\x1D\x21\x11"; // doble ancho + doble alto
         ticket += "FastRestaurant\n";
+
+        // Volver a tamaño normal
+        ticket += "\x1D\x21\x00";
+        // Opcional: quitar negrita
         ticket += "\x1B\x45\x00";
 
         ticket += "================================\n";

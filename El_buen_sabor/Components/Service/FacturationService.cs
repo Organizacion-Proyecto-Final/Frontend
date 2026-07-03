@@ -50,5 +50,26 @@ namespace El_buen_sabor.Components.Service
 
             response.EnsureSuccessStatusCode();
         }
+
+        public async Task ConfirmOrdersForInvoiceAsync(List<OrderToInvoiceDto> orders)
+        {
+            Console.WriteLine(orders == null
+                ? "Orders es NULL"
+                : $"Orders tiene {orders.Count} órdenes");
+
+            var request = new CreateInvoiceRequestDto
+            {
+                Orders = orders
+            };
+
+            var response = await _http.PostAsJsonAsync(
+                "api/v1/orders/facturas/from-orders",
+                request);
+
+            Console.WriteLine($"RESPUESTA FACTURA: {response.StatusCode}");
+
+            response.EnsureSuccessStatusCode();
+        }
+
     }
 }

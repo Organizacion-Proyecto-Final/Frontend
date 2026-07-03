@@ -1,0 +1,121 @@
+﻿.metrics-section {
+    color: white;
+    font-family: var(--app-font);
+}
+
+/* ================= TOOLBAR ================= */
+
+.metrics-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.metrics-title h2 {
+    font-size: 1.6rem;
+    margin: 0 0 6px 0;
+    border-bottom: 2px solid #0582ca;
+    padding-bottom: 8px;
+}
+
+.metrics-title p {
+    margin: 0;
+    color: #b9c7d8;
+}
+
+/* ================= CARDS ================= */
+
+.metrics-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.metric-card {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(5, 130, 202, 0.25);
+    border-radius: 8px;
+    padding: 18px;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+    .metric-card:hover {
+        transform: translateY(-2px);
+        background-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .metric-card span {
+        color: #b9c7d8;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .metric-card h2 {
+        margin: 10px 0 6px 0;
+        font-size: 1.8rem;
+        color: #ffffff;
+    }
+
+    .metric-card small {
+        color: #93a4b8;
+    }
+
+/* ================= GRID ================= */
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+/* ================= PANELS ================= */
+
+.metric-panel {
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+    .metric-panel h4 {
+        margin: 0 0 14px 0;
+        font-size: 1.05rem;
+        color: #e0e0e0;
+    }
+
+    /* ================= CHART SIZE CONTROL ================= */
+
+    .metric-panel canvas {
+        width: 100% !important;
+        max-height: 260px;
+    }
+
+/* wrapper importante para Chart.js */
+.chart-wrapper {
+    height: 260px;
+    position: relative;
+}
+.metric-panel:hover {
+    border-color: rgba(5, 130, 202, 0.35);
+    transition: 0.2s;
+}
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 900px) {
+    .metrics-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .metric-card h2 {
+        font-size: 1.5rem;
+    }
+}
