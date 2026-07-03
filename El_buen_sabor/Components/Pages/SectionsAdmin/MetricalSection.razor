@@ -190,10 +190,13 @@
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
 
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            try
             {
+                if (!await timer.WaitForNextTickAsync(cancellationToken))
+                    break;
+
                 await InvokeAsync(async () =>
                 {
                     await LoadMetricsAsync();
@@ -203,10 +206,14 @@
                         await RenderChartsAsync();
                 });
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // La actualización se detiene al abandonar la página.
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Un error transitorio no debe detener las próximas actualizaciones.
+            }
         }
     }
 

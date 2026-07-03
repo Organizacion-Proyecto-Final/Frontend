@@ -35,7 +35,7 @@
             </div>
 
             <button class="apply-btn @(isLoading ? "disabled" : "")"
-            @onclick="() => LoadFacturas()"
+            @onclick="LoadFacturas"
             disabled="@isLoading">
                 Aplicar →
             </button>
@@ -320,29 +320,31 @@
     // LOAD (BACK SIMULADO)
     // =========================
 
-    private async Task LoadFacturas(bool showLoading = true)
+    private async Task LoadFacturas()
     {
-        if (showLoading)
-            isLoading = true;
+        isLoading = true;
 
         try
         {
-            result = await _facturationService.GetFacturasAsync(
-                currentPage,
-                pageSize,
-                fromDate,
-                toDate,
-                selectedPaymentFilter
-            );
-
-            TotalPages = result.TotalPages;
-            TotalItems = result?.TotalItems ?? 0;
+            await RefreshFacturasAsync();
         }
         finally
         {
-            if (showLoading)
-                isLoading = false;
+            isLoading = false;
         }
+    }
+
+    private async Task RefreshFacturasAsync()
+    {
+        result = await _facturationService.GetFacturasAsync(
+            currentPage,
+            pageSize,
+            fromDate,
+            toDate,
+            selectedPaymentFilter);
+
+        TotalPages = result.TotalPages;
+        TotalItems = result.TotalItems;
     }
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -357,20 +359,27 @@
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
 
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            try
             {
+                if (!await timer.WaitForNextTickAsync(cancellationToken))
+                    break;
+
                 await InvokeAsync(async () =>
                 {
-                    await LoadFacturas(showLoading: false);
+                    await RefreshFacturasAsync();
                     StateHasChanged();
                 });
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // La actualización se detiene al abandonar la página.
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Un error transitorio no debe detener las próximas actualizaciones.
+            }
         }
     }
 

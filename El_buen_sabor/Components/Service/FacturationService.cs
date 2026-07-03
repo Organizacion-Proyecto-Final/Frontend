@@ -41,6 +41,7 @@ namespace El_buen_sabor.Components.Service
                     $"ToDate={Uri.EscapeDataString(toDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))}");
             }
 
+            queryParameters.Add($"_={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
             var url = $"api/v1/orders/facturas?{string.Join("&", queryParameters)}";
             var result = await _http.GetFromJsonAsync<FacturePagedResponseDto<FacturaDto>>(url);
 
@@ -68,7 +69,7 @@ namespace El_buen_sabor.Components.Service
         public async Task<FacturationMetricsDto> GetMetricsAsync()
         {
             var result = await _http.GetFromJsonAsync<FacturationMetricsDto>(
-                "api/v1/orders/facturas/metrics");
+                $"api/v1/orders/facturas/metrics?_={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
 
             return result ?? new FacturationMetricsDto();
         }
