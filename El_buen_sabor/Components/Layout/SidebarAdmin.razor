@@ -38,6 +38,8 @@
             <h3>Sistema</h3>
             <button type="button" class='@MenuButtonClass("/SettingsSection")' @onclick="SeccionConfiguracion">Configuración</button>
             <button type="button" class='@MenuButtonClass("/UsersSection")' @onclick="SeccionUsuarios">Usuarios</button>
+            <button type="button" class='@MenuButtonClass("/FacturacionSection")' @onclick="SeccionFacturacion">Facturación</button>
+            <button type="button" class='@MenuButtonClass("/MetricalSection")' @onclick="SeccionMetrical">Metricas</button>
         </div>
         <div class="menu-section mobile-account-section">
             <h3>Cuenta</h3>
@@ -76,6 +78,9 @@
     private void SeccionCocina() { NavigateAndClose("/kitchen"); }
     private void SeccionStock() { NavigateAndClose("/StockSection"); }
     private void SeccionMozo() { NavigateAndClose("/waiter"); }
+    private void SeccionFacturacion() { NavigateAndClose("/Facturation"); }
+    private void SeccionMetrical() { NavigateAndClose("/Metrical"); }
+
 
     private void ToggleMobileMenu()
     {

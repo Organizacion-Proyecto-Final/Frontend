@@ -6,12 +6,14 @@ namespace El_buen_sabor.Components.Service
     public class OperationService : IOperationService
     {
         private readonly ITableService _tableService;
+        private readonly IFacturationService _facturationService;
         private readonly List<OrderFromTable> items = [];
         private Table? table;
 
-        public OperationService(ITableService tableService)
+        public OperationService(ITableService tableService, IFacturationService facturationService)
         {
             _tableService = tableService;
+            _facturationService = facturationService;
         }
 
         public event Action? OnChange;
@@ -167,7 +169,7 @@ namespace El_buen_sabor.Components.Service
             return result;
         }
 
-        public async Task<OperationResultDto> RequestBillAsync()
+        public async Task<OperationResultDto> RequestBillAsync() /////////////////////// aca 
         {
             var activeOrders = await GetActiveOrdersAsync();
             if (activeOrders.Count == 0)
@@ -177,6 +179,9 @@ namespace El_buen_sabor.Components.Service
                 return Fail("Entregá todos los platos de todas las órdenes antes de pedir la cuenta.");
 
             OperationResultDto result = new() { Success = true, Message = "La cuenta ya fue solicitada." };
+
+            var ordersToInvoice = new List<OrderToInvoiceDto>();
+
 
             foreach (var order in activeOrders)
             {
@@ -189,6 +194,28 @@ namespace El_buen_sabor.Components.Service
                     OnChange?.Invoke();
                     return result;
                 }
+
+                ordersToInvoice.Add(new OrderToInvoiceDto
+                {
+
+                    TableNumber = order.TableNumber,
+                    Items = order.OrderItems.Select(i => new OrderItemDto
+                    {
+                        ProductName = i.Producto.Name,
+                        Quantity = i.Cantidad,
+                        Price = i.Producto.Price
+                    }).ToList()
+                });
+
+            }
+
+            try
+            {
+                await _facturationService.ConfirmOrdersForInvoiceAsync(ordersToInvoice);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Factura falló: {ex.Message}");
             }
 
             result.Message = "Cuenta solicitada.";
@@ -207,18 +234,45 @@ namespace El_buen_sabor.Components.Service
 
             OperationResultDto result = new() { Success = true, Message = "Mesa liberada." };
 
+
             foreach (var order in activeOrders)
             {
                 result = await _tableService.ChangeOrderStatusAsync(order.Id, OrderStatuses.Closed);
+
                 if (!result.Success)
-                {
-                    OnChange?.Invoke();
                     return result;
-                }
+
             }
+
 
             OnChange?.Invoke();
             return result;
+        }
+
+        public async Task<OperationResultDto> ConfirmTablePaymentAsync()
+        {
+            var activeOrders = await GetActiveOrdersAsync();
+            if (activeOrders.Count == 0)
+                return Fail("No hay órdenes activas para cobrar.");
+
+            if (!activeOrders.All(order => order.Status == OrderStatuses.ReadyToClose))
+                return Fail("Primero solicitá la cuenta de todas las órdenes.");
+
+            var tableNumber = activeOrders[0].TableNumber;
+
+            try
+            {
+                await _facturationService.ConfirmTablePaymentAsync(tableNumber);
+                return new OperationResultDto
+                {
+                    Success = true,
+                    Message = "Pago confirmado."
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return Fail("No se encontró una factura pendiente para esta mesa.");
+            }
         }
 
         private async Task<Order?> GetActiveOrderAsync()

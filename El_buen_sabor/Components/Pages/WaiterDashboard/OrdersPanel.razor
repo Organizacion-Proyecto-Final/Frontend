@@ -62,6 +62,13 @@
                             <strong>@MoneyFormatter.Format(TableTotal)</strong>
                         </div>
 
+                        <button type="button"
+                                class="payment-btn"
+                                disabled="@(isUpdatingTable || paymentConfirmed)"
+                                @onclick="ShowPaymentConfirmation">
+                            @(paymentConfirmed ? "Pago confirmado" : isUpdatingTable ? "Procesando..." : "Confirmar pago")
+                        </button>
+
                         <button type="button" class="release-btn" disabled="@isUpdatingTable" @onclick="ShowReleaseConfirmation">
                             @(isUpdatingTable ? "Procesando..." : "Liberar mesa")
                         </button>
@@ -146,6 +153,24 @@
     </div>
 }
 
+@if (showPaymentConfirm && ActiveOrder is not null)
+{
+    <div class="confirm-backdrop">
+        <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="payment-confirm-title">
+            <span>Confirmar pago</span>
+            <h4 id="payment-confirm-title">Cobrar @OperationService.GetTable()?.Name</h4>
+            <p>Confirmá que recibiste el pago de <strong>@MoneyFormatter.Format(TableTotal)</strong>.</p>
+
+            <div class="confirm-actions">
+                <button type="button" class="confirm-cancel" disabled="@isUpdatingTable" @onclick="HidePaymentConfirmation">Cancelar</button>
+                <button type="button" class="confirm-release" disabled="@isUpdatingTable" @onclick="ConfirmTablePayment">
+                    @(isUpdatingTable ? "Confirmando..." : "Confirmar pago")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @if (showReleaseConfirm && ActiveOrder is not null)
 {
     <div class="confirm-backdrop">
@@ -188,7 +213,9 @@
     private bool isLoading;
     private bool isUpdatingTable;
     private bool showBillConfirm;
+    private bool showPaymentConfirm;
     private bool showReleaseConfirm;
+    private bool paymentConfirmed;
     private string? tableActionMessage;
     private bool tableActionSucceeded;
     private Order? orderToConfirm;
@@ -390,6 +417,7 @@
 
     private async Task ConfirmRequestBill()
     {
+
         await RunTableAction(OperationService.RequestBillAsync);
         showBillConfirm = false;
     }
@@ -398,6 +426,27 @@
     {
         tableActionMessage = null;
         showReleaseConfirm = true;
+    }
+
+    private void ShowPaymentConfirmation()
+    {
+        tableActionMessage = null;
+        showPaymentConfirm = true;
+    }
+
+    private void HidePaymentConfirmation()
+    {
+        if (!isUpdatingTable)
+            showPaymentConfirm = false;
+    }
+
+    private async Task ConfirmTablePayment()
+    {
+        var result = await RunTableAction(OperationService.ConfirmTablePaymentAsync);
+        showPaymentConfirm = false;
+
+        if (result?.Success == true)
+            paymentConfirmed = true;
     }
 
     private void HideReleaseConfirmation()

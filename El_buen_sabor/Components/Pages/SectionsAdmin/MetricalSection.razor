@@ -1,0 +1,226 @@
+﻿@page "/Metrical"
+@layout AdminLayout
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using El_buen_sabor.Components.Interface
+@inject NavigationManager Navigation
+@inject IFacturationService _facturationService
+@inject IJSRuntime JS
+@using El_buen_sabor.Components.Models
+@using El_buen_sabor.Components.Service
+@using El_buen_sabor.Components.Layout
+@using System.Drawing.Printing;
+
+
+
+<hr class="my-4" />
+
+<div class="metrics-section">
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <p class="text-danger">@errorMessage</p>
+    }
+
+    <!-- ================= CARDS ================= -->
+    <div class="metrics-cards">
+
+        <div class="metric-card">
+            <span>💰 Ventas de hoy</span>
+            <h2>@todayTotal.ToString("C")</h2>
+            <small>@todayCount facturas pagadas</small>
+        </div>
+
+        <div class="metric-card">
+            <span>📅 Ventas del mes</span>
+            <h2>@monthTotal.ToString("C")</h2>
+            <small>@monthCount facturas pagadas</small>
+        </div>
+
+    </div>
+
+    <!-- ================= GRID CHARTS ================= -->
+    <div class="metrics-grid">
+
+        <!-- TOP PRODUCTS -->
+        <div class="metric-panel">
+            <h4>🏆 Los 10 productos más vendidos</h4>
+            <small>Unidades vendidas durante el mes actual</small>
+            <canvas id="topProductsChart"></canvas>
+        </div>
+
+        <!-- HOURS -->
+        <div class="metric-panel">
+            <h4>🕒 Horarios de mayor concurrencia</h4>
+            <small>Facturas generadas por hora durante el mes actual</small>
+            <canvas id="hoursChart"></canvas>
+        </div>
+
+    </div>
+
+    <!-- ================= MONEY PRODUCTS ================= -->
+    <div class="metrics-grid">
+
+        <div class="metric-panel">
+            <h4>💵 Productos con mayor recaudación</h4>
+            <small>Importe generado por productos de facturas pagadas este mes</small>
+            <canvas id="moneyProductsChart"></canvas>
+        </div>
+
+        <div class="metric-panel">
+            <h4>🕒 Concurrencia semanal</h4>
+            <small>Facturas generadas cada día de la semana actual</small>
+            <canvas id="weeklyHoursChart"></canvas>
+        </div>
+
+    </div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+@code {
+
+
+    private decimal todayTotal;
+    private int todayCount;
+    private decimal monthTotal;
+    private int monthCount;
+    private bool metricsReady;
+    private string? errorMessage;
+    private readonly CancellationTokenSource refreshCancellation = new();
+
+    private List<string> topProductsLabels = [];
+    private List<int> topProductsValues = [];
+    private List<string> hoursLabels = [];
+    private List<int> hoursValues = [];
+    private List<string> hoursLabelsemanal = [];
+    private List<int> hoursValuesemanal = [];
+    private List<string> moneyLabels = [];
+    private List<decimal> moneyValues = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetricsAsync();
+    }
+
+    private async Task LoadMetricsAsync()
+    {
+        try
+        {
+            var metrics = await _facturationService.GetMetricsAsync();
+
+            todayTotal = metrics.TodayTotal;
+            todayCount = metrics.TodayCount;
+            monthTotal = metrics.MonthTotal;
+            monthCount = metrics.MonthCount;
+
+            topProductsLabels = metrics.TopProducts
+                .Select(product => product.ProductName)
+                .ToList();
+            topProductsValues = metrics.TopProducts
+                .Select(product => product.Quantity)
+                .ToList();
+
+            hoursLabels = metrics.HourlyConcurrency
+                .Select(metric => metric.Hour.ToString("00"))
+                .ToList();
+            hoursValues = metrics.HourlyConcurrency
+                .Select(metric => metric.InvoiceCount)
+                .ToList();
+
+            moneyLabels = metrics.TopRevenueProducts
+                .Select(product => product.ProductName)
+                .ToList();
+            moneyValues = metrics.TopRevenueProducts
+                .Select(product => product.Revenue)
+                .ToList();
+
+            string[] dayLabels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+            hoursLabelsemanal = metrics.WeeklyConcurrency
+                .Select(metric => dayLabels[metric.DayOfWeek])
+                .ToList();
+            hoursValuesemanal = metrics.WeeklyConcurrency
+                .Select(metric => metric.InvoiceCount)
+                .ToList();
+
+            metricsReady = true;
+            errorMessage = null;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "No se pudieron cargar las métricas. Verificá que el microservicio de órdenes esté disponible.";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (metricsReady)
+                await RenderChartsAsync();
+
+            _ = RefreshPeriodicallyAsync(refreshCancellation.Token);
+        }
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        await JS.InvokeVoidAsync(
+            "charts.renderAll",
+            topProductsLabels,
+            topProductsValues,
+            hoursLabels,
+            hoursValues,
+            moneyLabels,
+            moneyValues,
+            hoursLabelsemanal,
+            hoursValuesemanal);
+    }
+
+    private async Task RefreshPeriodicallyAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!await timer.WaitForNextTickAsync(cancellationToken))
+                    break;
+
+                await InvokeAsync(async () =>
+                {
+                    await LoadMetricsAsync();
+                    StateHasChanged();
+
+                    if (metricsReady)
+                        await RenderChartsAsync();
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Un error transitorio no debe detener las próximas actualizaciones.
+            }
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        refreshCancellation.Cancel();
+        refreshCancellation.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

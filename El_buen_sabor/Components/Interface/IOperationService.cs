@@ -18,6 +18,7 @@
         public void AddNote(Guid productId, string note);
         public Task<OperationResultDto> SendOrderAsync();
         public Task<OperationResultDto> RequestBillAsync();
+        public Task<OperationResultDto> ConfirmTablePaymentAsync();
         public Task<OperationResultDto> ReleaseTableAsync();
 
 

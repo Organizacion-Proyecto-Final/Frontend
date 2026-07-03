@@ -2,6 +2,7 @@ using Blazored.LocalStorage;
 using El_buen_sabor.Components;
 using El_buen_sabor.Components.Interface;
 using El_buen_sabor.Components.Service;
+using El_buen_sabor;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,13 @@ builder.Services.AddScoped<AuthSessionService>();
 builder.Services.AddScoped<OrderRealtimeService>();
 builder.Services.AddScoped<KitchenRealtimeService>();
 builder.Services.AddScoped<IOperationService, OperationService>();
+builder.Services.AddScoped<IFacturationService, FacturationService>();
+
+
+
+
+Console.WriteLine(builder.Configuration["ExternalServices:Menu:BaseUrl"]);
+Console.WriteLine(" ES EL DE ARRIBA");
 
 builder.Services.AddScoped(sp =>
 {
@@ -52,6 +60,12 @@ builder.Services.AddHttpClient<StockService>(client =>
     var stockBaseUrl = builder.Configuration["ExternalServices:Stock:BaseUrl"] ?? "https://localhost:7030/";
     client.BaseAddress = new Uri(stockBaseUrl);
 });
+builder.Services.AddHttpClient<IFacturationService, FacturationService>(client =>
+{
+    var ordersBaseUrl = builder.Configuration["ExternalServices:Orders:BaseUrl"] ?? "https://localhost:7100/";
+    client.BaseAddress = new Uri(ordersBaseUrl);
+});
+
 builder.Services.AddBlazoredLocalStorage();
 var app = builder.Build();
 

@@ -1,0 +1,510 @@
+﻿@page "/Facturation"
+@layout AdminLayout
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using El_buen_sabor.Components.Interface
+@inject NavigationManager Navigation
+@inject IFacturationService _facturationService 
+@inject IJSRuntime JS
+@using El_buen_sabor.Components.Models
+@using El_buen_sabor.Components.Service
+@using El_buen_sabor.Components.Layout
+@using System.Drawing.Printing;
+
+<div class="billing-container">
+
+    <div class="billing-toolbar">
+        <div class="billing-title">
+            <h2>Facturación</h2>
+            <p>ventas y metricas del sistema.</p>
+        </div>
+    </div>
+
+    <section class="billing-control-panel" aria-label="Filtros de facturación">
+
+        <div class="date-filter">
+
+            <div class="search-field">
+                <label>Desde</label>
+                <input type="date" class="form-control" @bind="fromDate" />
+            </div>
+
+            <div class="search-field">
+                <label>Hasta</label>
+                <input type="date" class="form-control" @bind="toDate" />
+            </div>
+
+            <button class="apply-btn @(isLoading ? "disabled" : "")"
+            @onclick="LoadFacturas"
+            disabled="@isLoading">
+                Aplicar →
+            </button>
+
+
+        </div>
+
+        <div class="payment-summary">
+
+
+            <button class="summary-item all @(selectedPaymentFilter == PaymentFilter.All ? "active" : "")"
+            @onclick="() => SetPaymentFilter(PaymentFilter.All)">
+                Todas 
+            </button>
+
+            <button class="summary-item pending @(selectedPaymentFilter == PaymentFilter.Pending ? "active" : "")"
+            @onclick="() => SetPaymentFilter(PaymentFilter.Pending)">
+                Pendientes 
+            </button>
+
+            <button class="summary-item paid @(selectedPaymentFilter == PaymentFilter.Paid ? "active" : "")"
+            @onclick="() => SetPaymentFilter(PaymentFilter.Paid)">
+                Pagadas 
+            </button>
+        </div>
+
+    </section>
+
+
+
+
+
+
+    <div class="table-container">
+
+        @if (isLoading)
+        {
+            <div class="loading-text">Cargando facturación...</div>
+        }
+        else if (result is null || result.Items.Count == 0)
+        {
+            <div class="empty-state">No hay registros de facturación.</div>
+        }
+        else
+        {
+            <table class="custom-table">
+
+                <thead>
+                    <tr>
+                        <th>Mesa</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var item in result.Items)
+                    {
+                        <tr>
+                            <td>Mesa @item.TableName</td>
+                            <td>@ToUtcMinus3(item.Date).ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>$@item.Total.ToString("0.00")</td>
+
+                            <td>
+                                <span class="status-badge @(item.IsPaid ? "paid" : "pending")">
+                                    @(item.IsPaid ? "Pagado" : "Pendiente")
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="row-actions">
+
+                                    <button class="action-btn detail"
+                                    @onclick="() => OpenDetail(item)">
+                                        Detalle
+                                    </button>
+
+                                    <button class="action-btn ticket"
+                                    @onclick="() => PrintTicket(item)"
+                                    disabled="@isPrinting">
+                                        @(isPrinting ? "Imprimiendo..." : "Ticket")
+                                    </button>
+
+                                    <button class="action-btn confirm"
+                                    @onclick="() => OpenPayModal(item)"
+                                    disabled="@item.IsPaid">
+                                        @(item.IsPaid ? "Pagado" : "Confirmar pago")
+                                    </button>
+
+                                </div>
+                            </td>
+
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+
+
+        }
+
+
+    </div>
+
+    @if (result is not null && result.Items.Any())
+    {
+        <div class="pagination">
+
+            <button class="page-btn"
+            @onclick="PrevPage"
+            disabled="@(result?.PageNumber <= 1)">
+                ←
+            </button>
+
+            <span class="page-info">
+                Página @currentPage de @TotalPages
+            </span>
+
+            <button class="page-btn"
+            @onclick="NextPage"
+            disabled="@(result?.PageNumber >= TotalPages)">
+                →
+            </button>
+
+        </div>
+    }
+
+
+</div>
+
+@if (showPayModal && selectedFacturaPay is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal-box modal-pay" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+
+            <span class="modal-eyebrow">Confirmar pago</span>
+
+            <h3 id="pay-title">
+                Mesa @selectedFacturaPay.TableName
+            </h3>
+
+            <p>
+                ¿Confirmás el pago de la factura por
+                <strong>$@GetTotal(selectedFacturaPay).ToString("0.00")</strong>
+            </p>
+
+            @if (!string.IsNullOrEmpty(modalMessage))
+            {
+                <div class="alert-info-update error" role="alert">
+                    @modalMessage
+                </div>
+            }
+
+            <div class="modal-actions">
+                <button type="button"
+                class="modal-cancel"
+                @onclick="ClosePayModal"
+                disabled="@isPaying">
+                    Cancelar
+                </button>
+
+                <button type="button"
+                class="modal-confirm"
+                @onclick="ConfirmPay"
+                disabled="@isPaying">
+                    @(isPaying ? "Procesando..." : "Confirmar pago")
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@if (showDetailModal && selectedFacturaDetail is not null)
+{
+    <div class="modal-overlay">
+        <div class="modal-box modal-detail">
+
+            <div class="detail-header">
+                <span class="modal-eyebrow">Detalle de factura</span>
+
+                <h3>Mesa @selectedFacturaDetail.TableName</h3>
+
+                <p class="detail-date">
+                    Fecha: @ToUtcMinus3(selectedFacturaDetail.Date).ToString("dd/MM/yyyy HH:mm")
+                </p>
+            </div>
+
+            <div class="detail-table-container">
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Cant</th>
+                            <th>Producto</th>
+                            <th>Precio Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var d in selectedFacturaDetail.Details)
+                        {
+                            <tr>
+                                <td>@d.Quantity</td>
+
+                                <td>@d.ProductName</td>
+
+                                <td>$@d.Price.ToString("0.00")</td>
+
+                                <td>
+                                    $@((d.Quantity * d.Price).ToString("0.00"))
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="detail-footer">
+                <h3>
+                    Total: $@GetTotal(selectedFacturaDetail).ToString("0.00")
+                </h3>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-cancel" @onclick="CloseDetail">
+                    Cerrar
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+
+
+@code {
+
+    private bool showPayModal = false;
+    private bool isPaying = false;
+    private bool isPrinting;
+
+    private FacturaDto? selectedFacturaDetail;
+    private FacturaDto? selectedFacturaPay;
+
+    private string? modalMessage;
+    private bool isLoading = true;
+    private bool showDetailModal = false;
+    private readonly CancellationTokenSource refreshCancellation = new();
+
+
+    private DateTime? fromDate = DateTime.Today.AddDays(-60);
+    private DateTime? toDate = DateTime.Today;
+
+    private PaymentFilter selectedPaymentFilter = PaymentFilter.All;
+
+    private FacturePagedResponseDto<FacturaDto>? result;
+
+    private int TotalItems;
+    private int currentPage = 1;
+    private int pageSize = 8;
+    private int TotalPages;
+
+
+    public enum PaymentFilter
+    {
+        All,
+        Pending,
+        Paid,
+        Cancel
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFacturas();
+    }
+
+    // =========================
+    // LOAD (BACK SIMULADO)
+    // =========================
+
+    private async Task LoadFacturas()
+    {
+        isLoading = true;
+
+        try
+        {
+            await RefreshFacturasAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshFacturasAsync()
+    {
+        result = await _facturationService.GetFacturasAsync(
+            currentPage,
+            pageSize,
+            fromDate,
+            toDate,
+            selectedPaymentFilter);
+
+        TotalPages = result.TotalPages;
+        TotalItems = result.TotalItems;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _ = RefreshPeriodicallyAsync(refreshCancellation.Token);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshPeriodicallyAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!await timer.WaitForNextTickAsync(cancellationToken))
+                    break;
+
+                await InvokeAsync(async () =>
+                {
+                    await RefreshFacturasAsync();
+                    StateHasChanged();
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Un error transitorio no debe detener las próximas actualizaciones.
+            }
+        }
+    }
+
+    // =========================
+    // FILTROS
+    // =========================
+
+    private async Task SetPaymentFilter(PaymentFilter filter)
+    {
+        selectedPaymentFilter = filter;
+        currentPage = 1;
+        await LoadFacturas();
+    }
+
+    private async Task OnDateChanged()
+    {
+        currentPage = 1;
+        await LoadFacturas();
+    }
+
+    // =========================
+    // PAGINACIÓN
+    // =========================
+
+    private async Task NextPage()
+    {
+        if (currentPage < (result?.TotalPages ?? 1))
+        {
+            currentPage++;
+            await LoadFacturas();
+        }
+    }
+
+    private async Task PrevPage()
+    {
+        if (currentPage > 1)
+        {
+            currentPage--;
+            await LoadFacturas();
+        }
+    }
+
+    // =========================
+    // ACCIONES
+    // =========================
+
+
+    private void OpenDetail(FacturaDto item)
+    {
+        selectedFacturaDetail = item;
+        showDetailModal = true;
+    }
+
+    private void OpenPayModal(FacturaDto item)
+    {
+        selectedFacturaPay = item;
+        showPayModal = true;
+    }
+
+    private void ClosePayModal()
+    {
+        showPayModal = false;
+        selectedFacturaPay = null;
+        modalMessage = null;
+    }
+
+    private void CloseDetail()
+    {
+        showDetailModal = false;
+        selectedFacturaDetail = null;
+    }
+
+    private decimal GetTotal(FacturaDto factura)
+    {
+        return factura.Details.Sum(d => d.Price * d.Quantity);
+    }
+
+    private static DateTime ToUtcMinus3(DateTime date)
+    {
+        var utcDate = date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
+
+        return utcDate.AddHours(-3);
+    }
+
+    private async Task PrintTicket(FacturaDto factura)
+    {
+        await JS.InvokeVoidAsync("printTicket", "POS-58", factura);
+    }
+
+    private async Task ConfirmPay()
+    {
+        if (selectedFacturaPay is null)
+            return;
+
+        isPaying = true;
+
+        try
+        {
+            await _facturationService.ConfirmPaymentAsync(selectedFacturaPay.Id);
+
+            showPayModal = false;
+            selectedFacturaPay = null;
+
+            await LoadFacturas();
+        }
+        catch
+        {
+            modalMessage = "Error al confirmar el pago";
+        }
+        finally
+        {
+            isPaying = false;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        refreshCancellation.Cancel();
+        refreshCancellation.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+}
